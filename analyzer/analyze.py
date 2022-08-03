@@ -224,6 +224,7 @@ def peak_mem_by_query(stats):
     """
     peak_mem = [s["peak_mem"] for s in stats]
     query_ids = [s["query_id"] for s in stats]
+    queries = [s["query"] for s in stats]
     date = [query_datetime(query_id) for query_id in query_ids]
     p = figure(
         title="Peak memory used by queries",
@@ -236,7 +237,7 @@ def peak_mem_by_query(stats):
     )
     p.yaxis.ticker = [1, 1e3, 1e6, 1e9, 1e10, 1e12]
 
-    source = ColumnDataSource(dict(peak_mem=peak_mem, date=date, copy_on_tap=query_ids))
+    source = ColumnDataSource(dict(peak_mem=peak_mem, date=date, copy_on_tap=queries))
     p.select(type=TapTool).callback = CustomJS(args=dict(source=source), code=COPY_JS)
     p.circle("date", "peak_mem", source=source, alpha=0.5)
     add_constant_line(p, 'width', 1e10)
@@ -255,6 +256,7 @@ def input_size_by_query(stats):
     """
     input_size = [s["input_size"] for s in stats]
     query_ids = [s["query_id"] for s in stats]
+    queries = [s["query"] for s in stats]
     date = [query_datetime(query_id) for query_id in query_ids]
     p = figure(
         title="Input data read by queries",
@@ -267,7 +269,7 @@ def input_size_by_query(stats):
     )
     p.yaxis.ticker = [1, 1e3, 1e6, 1e9, 1e12]
 
-    source = ColumnDataSource(dict(input_size=input_size, date=date, copy_on_tap=query_ids))
+    source = ColumnDataSource(dict(input_size=input_size, date=date, copy_on_tap=queries))
     p.select(type=TapTool).callback = CustomJS(args=dict(source=source), code=COPY_JS)
     p.circle("date", "input_size", source=source, alpha=0.5)
     add_constant_line(p, 'width', 1e12)
@@ -284,6 +286,7 @@ def elapsed_time_by_query(stats):
     """
     elapsed_time = [s["elapsed_time"] for s in stats]
     query_ids = [s["query_id"] for s in stats]
+    queries = [s["query"] for s in stats]
     date = [query_datetime(query_id) for query_id in query_ids]
     p = figure(
         title="Elapsed time by queries",
@@ -295,7 +298,7 @@ def elapsed_time_by_query(stats):
         tools=TOOLS,
     )
     p.yaxis.ticker = [1e-3, 1, 1e3, 1e6]
-    source = ColumnDataSource(dict(elapsed_time=elapsed_time, date=date, copy_on_tap=query_ids))
+    source = ColumnDataSource(dict(elapsed_time=elapsed_time, date=date, copy_on_tap=queries))
     p.select(type=TapTool).callback = CustomJS(args=dict(source=source), code=COPY_JS)
     p.circle("date", "elapsed_time", source=source, alpha=0.5)
     add_constant_line(p, 'width', 300)
@@ -827,6 +830,7 @@ def walltime_vs_selectivity(stats, topK=5, colorblind=False):
     source = ColumnDataSource(
         dict(selectivity=selectivity, elapsed_time=elapsed_time, table_name=tables, colors=colors, markers=markers,
              copy_on_tap=query_ids))
+
     p.scatter("selectivity", "elapsed_time", legend_group="table_name", color="colors", marker="markers", source=source,
               size=shape_size)
     p.select(type=TapTool).callback = CustomJS(args=dict(source=source), code=COPY_JS)
@@ -916,6 +920,7 @@ def inputrows_vs_selectivity(stats, topK=5, colorblind=False):
     source = ColumnDataSource(
         dict(selectivity=selectivity, input_rows=input_rows, table_name=tables, colors=colors, markers=markers,
              copy_on_tap=query_ids))
+
     p.scatter("selectivity", "input_rows", legend_group="table_name", color="colors", marker="markers", source=source,
               size=shape_size)
     p.select(type=TapTool).callback = CustomJS(args=dict(source=source), code=COPY_JS)
@@ -1162,10 +1167,9 @@ def joins_selectivity(stats):
     for stat, node, probe, build in joins:
         x = max(probe["input_rows"], build["input_rows"])
         y = probe["output_rows"]
-        data.append((x, y, stat["query_id"]))
+        data.append((x, y, stat["query"]))
     x, y, query_ids = zip(*data)
     source = ColumnDataSource(dict(x=x, y=y, copy_on_tap=query_ids))
-
     p.circle("x", "y", source=source, color="green", alpha=0.5)
     p.select(type=TapTool).callback = CustomJS(args=dict(source=source), code=COPY_JS)
 

@@ -39,10 +39,10 @@ class Client:
         if request_header:
             if request_header not in ('X-Trino-User', 'X-Presto-User'):
                 log.warning('Got client-request-header which is not X-Trino-User or X-Presto-User, collecting JSONs might fail')
-            return {request_header: "analyzer"}
+            return {request_header: "admin"}
         else:
-            return {"X-Trino-User": "analyzer",
-                    "X-Presto-User": "analyzer"}
+            return {"X-Trino-User": "admin",
+                    "X-Presto-User": "admin"}
 
     def get(self, url):
         if all([self._username, self._password]):

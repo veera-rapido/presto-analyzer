@@ -23,6 +23,7 @@ import logbook
 import pathlib
 import sys
 import tqdm
+import traceback
 
 logbook.StreamHandler(sys.stderr).push_application()
 log = logbook.Logger("extract")
@@ -121,8 +122,8 @@ def build_tasks_in_substages(stage):
 
 
 def summary(j: dict):
-    session = j["session"]
-    stats = j["queryStats"]
+    session = json.loads(j['session'])
+    stats = json.loads(j['querystats'])
 
     if session.get('catalogProperties', {}).get('varada', {}).get('internal_query', '') == 'true':
         # varada internal query - skip it
@@ -130,15 +131,20 @@ def summary(j: dict):
 
     fragments = None
     substages = None
-    stage = j.get("outputStage")
+    stage = j.get("outputstage")
     if stage:
+        stage = json.loads(stage)
         fragments = list(iter_plans(stage))
         substages = build_tasks_in_substages(stage)
+    
+    output = {}
+    if "output" in j:
+        output = json.loads(j.get("output"))
 
     try:
         return dict(
             query=j["query"],
-            query_id=j["queryId"],
+            query_id=j["queryid"],
             user=session["user"],
             state=j["state"],
             error_code=j.get("errorCode"),
@@ -160,12 +166,13 @@ def summary(j: dict):
             peak_mem=parse_size(stats["peakTotalMemoryReservation"]),
             written_size=parse_size(stats.get("rawWrittenDataSize")),
             operators=list(get_operators(stats["operatorSummaries"])),
-            inputs=j["inputs"],
-            output=j.get("output"),
+            inputs=json.loads(j["inputs"]),
+            output=output,
             fragments=fragments,
             substages=substages
         )
     except KeyError:
+        traceback.print_exc()
         log.warning("missing key for {}", stats)
 
 
@@ -177,7 +184,7 @@ def main():
     args = p.parse_args()
 
     paths = [
-        p for pattern in ["*.json", "*.json.gz"] for p in args.input_dir.glob(pattern)
+        p for pattern in ["*.json","*.jsonl", "*.json.gz"] for p in args.input_dir.glob(pattern)
     ]
     log.info("{} JSONs found at {}", len(paths), args.input_dir.absolute())
     paths = sorted(paths)
@@ -196,10 +203,27 @@ def main():
                     else path.open("rt")
                 )
                 with input_file as f:
-                    s = summary(json.load(f))
-                    if s:
-                        json.dump(s, output)
-                        output.write("\n")
+                    s = ""
+                    if path.name.endswith(".jsonl"):
+                        json_list = list(f)
+                        for j in json_list:
+                            try:
+                                x=json.loads(j)
+
+                                if x["state"] != "FAILED" and "session" in x:
+                                    s = summary(x)
+                                    if s:
+                                        json.dump(s, output)
+                                        output.write("\n")
+                            except Exception as e:
+                                traceback.print_exc()
+                                print(e)
+                                print("One of the query failed and we are fine with it")
+                    else:
+                        s = summary(json.load(f))
+                        if s:
+                            json.dump(s, output)
+                            output.write("\n")
                 pbar.update(size)
 
     log.info(
